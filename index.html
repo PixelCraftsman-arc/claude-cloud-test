@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TypoFix</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+<style>
+  /* Layout: a manuscript sheet with a proofreader's margin rail beside it;
+     the rail stacks under the sheet on narrow screens. */
+  :root {
+    --paper: #f3f5f8;
+    --sheet: #ffffff;
+    --ink: #1a1f2b;
+    --ink-soft: #586176;
+    --rule: #dbe0e8;
+    --pencil: #2a55d6;
+    --pencil-ink: #ffffff;
+    --sp: #c4352e;
+    --del: #8b3fb6;
+    --cap: #a86300;
+    --space: #0c7a74;
+    --font-ui: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+    --font-text: "Newsreader", Georgia, "Times New Roman", serif;
+    --font-mark: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #11141b; --sheet: #191d26; --ink: #e5e8ef; --ink-soft: #99a2b5; --rule: #2b3140;
+      --pencil: #7d9bff; --pencil-ink: #0c1120;
+      --sp: #ff7d73; --del: #cc9cf2; --cap: #efb44b; --space: #4fd0c4;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #11141b; --sheet: #191d26; --ink: #e5e8ef; --ink-soft: #99a2b5; --rule: #2b3140;
+    --pencil: #7d9bff; --pencil-ink: #0c1120;
+    --sp: #ff7d73; --del: #cc9cf2; --cap: #efb44b; --space: #4fd0c4;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.5 var(--font-ui);
+    padding-inline: 16px;
+    padding-block: 24px 48px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 20px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+  h1 { margin: 0; font-size: 1.9rem; font-weight: 700; letter-spacing: -0.02em; }
+  h1 .caret { color: var(--pencil); font-weight: 600; }
+  .tagline { margin: 0; color: var(--ink-soft); text-wrap: balance; }
+
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .rules { display: flex; flex-wrap: wrap; gap: 6px; border: 0; margin: 0; padding: 0; }
+  .rules legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .chip { position: relative; }
+  .chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .chip span {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border: 1px solid var(--rule); border-radius: 999px;
+    background: var(--sheet); color: var(--ink-soft); font-size: 0.86rem; user-select: none;
+  }
+  .chip span b { font: 600 0.72rem var(--font-mark); color: var(--k); }
+  .chip input:checked + span { color: var(--ink); border-color: color-mix(in srgb, var(--k) 55%, var(--rule)); background: color-mix(in srgb, var(--k) 9%, var(--sheet)); }
+  .chip input:focus-visible + span { outline: 2px solid var(--pencil); outline-offset: 2px; }
+  .spacer { flex: 1; }
+
+  button {
+    font: 500 0.9rem var(--font-ui); color: var(--ink); cursor: pointer;
+    border: 1px solid var(--rule); background: var(--sheet); border-radius: 8px; padding: 7px 14px;
+  }
+  button:hover { border-color: var(--ink-soft); }
+  button:focus-visible { outline: 2px solid var(--pencil); outline-offset: 2px; }
+  button:disabled { opacity: 0.45; cursor: default; border-color: var(--rule); }
+  button.primary { background: var(--pencil); border-color: var(--pencil); color: var(--pencil-ink); font-weight: 600; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+
+  .desk { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 820px) { .desk { grid-template-columns: minmax(0, 1fr); } }
+
+  .sheet { background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px; min-width: 0; }
+  .sheet-head, .margin-head {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    padding: 10px 18px; border-bottom: 1px solid var(--rule);
+    font: 600 0.72rem var(--font-mark); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .sheet-head span:last-child { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; text-transform: none; font-weight: 400; }
+
+  /* The draft is a transparent textarea over a backdrop that draws the marks.
+     Both must share every metric that affects wrapping. */
+  .editor { position: relative; }
+  .draft-text {
+    font: 400 1.15rem/1.65 var(--font-text);
+    padding: 20px 22px 28px; margin: 0; border: 0;
+    white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; tab-size: 4;
+    width: 100%;
+  }
+  .backdrop { position: absolute; inset: 0; color: transparent; pointer-events: none; overflow: hidden; }
+  textarea.draft-text {
+    position: relative; display: block; resize: none; overflow: hidden; min-height: 22rem;
+    background: transparent; color: var(--ink); caret-color: var(--pencil); outline: none;
+  }
+  textarea.draft-text::placeholder { color: var(--ink-soft); font-style: italic; }
+  .editor:focus-within { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--pencil) 35%, transparent); }
+  .backdrop mark {
+    color: transparent; border-radius: 2px;
+    background: color-mix(in srgb, var(--k) 13%, transparent);
+    text-decoration: underline wavy var(--k); text-decoration-thickness: 1.5px; text-underline-offset: 4px;
+    transition: background 0.15s;
+  }
+  .backdrop mark.k-repeat { text-decoration: line-through var(--k) 2px; }
+  .backdrop mark.k-spacing { text-decoration: none; background: color-mix(in srgb, var(--k) 22%, transparent); }
+  .backdrop mark.active { background: color-mix(in srgb, var(--k) 32%, transparent); }
+
+  .k-spelling { --k: var(--sp); }
+  .k-repeat { --k: var(--del); }
+  .k-case { --k: var(--cap); }
+  .k-spacing { --k: var(--space); }
+
+  .margin { min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+  @media (max-width: 820px) { .margin { position: static; } }
+  .margin-head { border: 1px solid var(--rule); border-bottom: 0; border-radius: 4px 4px 0 0; background: var(--sheet); }
+  .notes {
+    list-style: none; margin: 0; padding: 0; border: 1px solid var(--rule); border-radius: 0 0 4px 4px;
+    background: var(--sheet); max-height: calc(100vh - 220px); overflow-y: auto;
+  }
+  @media (max-width: 820px) { .notes { max-height: none; } }
+  .note { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+  .note:last-child { border-bottom: 0; }
+  .note:hover, .note.active { background: color-mix(in srgb, var(--k) 6%, var(--sheet)); }
+  .mark {
+    grid-row: span 3; align-self: start; min-width: 2.4rem; text-align: center;
+    font: 600 0.78rem/1 var(--font-mark); color: var(--k);
+    border: 1.5px solid var(--k); border-radius: 50%; padding: 0.55rem 0.3rem;
+  }
+  .note.unsure .mark { border-style: dashed; }
+  .note-msg { font-size: 0.82rem; color: var(--ink-soft); }
+  .context { font: 1rem/1.45 var(--font-text); overflow-wrap: anywhere; }
+  .context .was { color: var(--k); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+  .context .ell { color: var(--ink-soft); }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .actions button { padding: 4px 10px; font-size: 0.86rem; border-radius: 6px; }
+  .actions .fix { font-family: var(--font-text); font-size: 1rem; border-color: color-mix(in srgb, var(--k) 45%, var(--rule)); }
+  .actions .fix:first-child { background: color-mix(in srgb, var(--k) 12%, var(--sheet)); }
+  .actions .quiet { border-color: transparent; color: var(--ink-soft); background: transparent; }
+  .actions .quiet:hover { border-color: var(--rule); color: var(--ink); }
+  .actions .quiet b { font-family: var(--font-mark); font-size: 0.78rem; }
+
+  .empty { padding: 28px 18px; text-align: center; color: var(--ink-soft); }
+  .empty strong { display: block; color: var(--ink); font-size: 1.05rem; margin-bottom: 4px; }
+
+  footer { color: var(--ink-soft); font-size: 0.82rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  footer kbd { font: 0.75rem var(--font-mark); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--sheet); }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); transform: translate(-50%, 8px);
+    background: var(--ink); color: var(--sheet); padding: 8px 16px; border-radius: 8px; font-weight: 500;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Typo<span class="caret">‸</span>Fix</h1>
+    <p class="tagline">Finds slips of the fingers and fixes them. Runs entirely in your browser, nothing is uploaded.</p>
+  </header>
+
+  <div class="toolbar">
+    <fieldset class="rules">
+      <legend>Checks</legend>
+      <label class="chip k-spelling"><input type="checkbox" id="rule-spelling" data-rule="spelling" checked><span><b>sp</b> Spelling</span></label>
+      <label class="chip k-repeat"><input type="checkbox" id="rule-repeats" data-rule="repeats" checked><span><b>del</b> Repeated words</span></label>
+      <label class="chip k-case"><input type="checkbox" id="rule-capitals" data-rule="capitals" checked><span><b>cap</b> Capitals</span></label>
+      <label class="chip k-spacing"><input type="checkbox" id="rule-spacing" data-rule="spacing" checked><span><b>#</b> Spacing</span></label>
+    </fieldset>
+    <span class="spacer"></span>
+    <button type="button" id="copy">Copy text</button>
+    <button type="button" id="fix-all" class="primary">Fix all</button>
+  </div>
+
+  <main class="desk">
+    <section class="sheet" aria-label="Draft">
+      <div class="sheet-head"><span>Draft</span><span id="stats">0 words</span></div>
+      <div class="editor">
+        <div class="backdrop draft-text" id="backdrop" aria-hidden="true"></div>
+        <textarea class="draft-text" id="draft" spellcheck="false" autocapitalize="off" autocomplete="off"
+          placeholder="Type or paste your text here." aria-describedby="stats"></textarea>
+      </div>
+    </section>
+
+    <aside class="margin" aria-label="Corrections">
+      <div class="margin-head"><span>Margin</span><span id="count">0 marks</span></div>
+      <ul class="notes" id="notes" aria-live="polite"></ul>
+    </aside>
+  </main>
+
+  <footer>
+    <span id="dict-info">Loading dictionary…</span>
+    <span><kbd>Ctrl</kbd> <kbd>Enter</kbd> fixes everything; <kbd>Ctrl</kbd> <kbd>Z</kbd> undoes it.</span>
+  </footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="data/words.js"></script>
+<script src="src/spell.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "typofix",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser app that finds and fixes typing errors, entirely offline.",
+  "scripts": {
+    "test": "node --test",
+    "build:words": "node scripts/build-wordlist.mjs"
+  }
+}
